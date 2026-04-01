@@ -30,6 +30,7 @@ jobs:
       - name: Build with Gradle
         run: |
           cd order-service
+          chmod +x gradlew
           ./gradlew build -x test
 
       - name: Upload JAR artifact
