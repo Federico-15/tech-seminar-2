@@ -1,1 +1,0 @@
-# tech-seminar-2

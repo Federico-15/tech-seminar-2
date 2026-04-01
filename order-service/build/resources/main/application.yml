@@ -1,0 +1,59 @@
+server:
+  port: 8090
+
+spring:
+  profiles:
+    active: chaos-monkey
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:5}
+      connection-timeout: 30000
+      pool-name: HikariPool-orders
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.MySQLDialect
+    show-sql: false
+
+# Chaos Monkey 설정
+chaos:
+  monkey:
+    enabled: true
+    watcher:
+      service: true
+      repository: true
+    assaults:
+      level: 5
+      latency-active: false
+      latency-range-start: 3000
+      latency-range-end: 10000
+      exceptions-active: false
+      kill-application-active: false
+
+# Actuator
+management:
+  endpoint:
+    chaosmonkey:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+
+# 로그 설정
+logging:
+  level:
+    root: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+    com.zaxxer.hikari: WARN      # HikariCP 경고 로그는 허용
+    com.seminar.orderservice: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%-8level] %X{pii}%msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%-8level] %X{pii}%msg%n"
+  file:
+    name: /var/log/app/app.log

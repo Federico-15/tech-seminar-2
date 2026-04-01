@@ -1,0 +1,95 @@
+name: Deploy order-service to EC2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "order-service/**"
+      - ".github/workflows/order-service.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "order-service/**"
+      - ".github/workflows/order-service.yml"
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Build with Gradle
+        run: |
+          cd order-service
+          ./gradlew build -x test
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: order-service-jar
+          path: order-service/build/libs/*[^plain].jar
+
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: order-service-jar
+          path: ./artifact
+
+      - name: Copy JAR to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "./artifact/*.jar"
+          target: "/home/ubuntu/order-service/"
+          strip_components: 1
+
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: DB_URL,DB_USERNAME,DB_PASSWORD
+          script: |
+            # .env 파일 생성
+            mkdir -p /home/ubuntu/order-service
+            cat > /home/ubuntu/order-service/.env << EOF
+            DB_URL=$DB_URL
+            DB_USERNAME=$DB_USERNAME
+            DB_PASSWORD=$DB_PASSWORD
+            DB_POOL_SIZE=5
+            EOF
+
+            # 로그 디렉토리 생성
+            mkdir -p /var/log/app
+
+            # 기존 프로세스 종료
+            pkill -f "order-service.*\.jar" || true
+            sleep 3
+
+            # 실행
+            cd /home/ubuntu/order-service
+            nohup java -jar *.jar > /var/log/app/app.log 2>&1 &
+            echo "Started order-service with PID $!"
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USERNAME: ${{ secrets.DB_USERNAME }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
