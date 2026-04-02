@@ -98,9 +98,15 @@ jobs:
           ssh -i /tmp/ec2_key \
             -o StrictHostKeyChecking=no \
             ${EC2_USER}@${EC2_HOST} '
-              mkdir -p $HOME/order-service/logs
+              set -x
+              echo "=== Java check ==="
+              java -version
+              echo "=== JAR files ==="
+              ls $HOME/order-service/*.jar
+              echo "=== kill existing ==="
               pkill -f "order-service.*\.jar" || true
               sleep 3
+              echo "=== starting app ==="
               cd $HOME/order-service
               nohup java -jar *.jar > logs/startup.log 2>&1 </dev/null &
               echo "Started PID $!"
