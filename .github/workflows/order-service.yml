@@ -52,48 +52,51 @@ jobs:
           name: order-service-jar
           path: ./artifact
 
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > /tmp/ec2_key
+          chmod 600 /tmp/ec2_key
+
       - name: Copy JAR to EC2
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "./artifact/*.jar"
-          target: "/home/ubuntu/order-service/"
-          strip_components: 1
+        run: |
+          scp -i /tmp/ec2_key \
+            -o StrictHostKeyChecking=no \
+            ./artifact/*.jar \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/order-service/
 
       - name: Deploy on EC2
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          debug: true
-          envs: DB_URL,DB_USERNAME,DB_PASSWORD
-          script: |
-            # .env 파일 생성
-            mkdir -p /home/ubuntu/order-service
-            cat > /home/ubuntu/order-service/.env << EOF
-            DB_URL=$DB_URL
-            DB_USERNAME=$DB_USERNAME
-            DB_PASSWORD=$DB_PASSWORD
-            DB_POOL_SIZE=5
-            LOG_PATH=/home/ubuntu/order-service/logs
-            EOF
-
-            # 로그 디렉토리 생성 (ubuntu 유저가 쓸 수 있는 경로)
-            mkdir -p /home/ubuntu/order-service/logs
-
-            # 기존 프로세스 종료
-            pkill -f "order-service.*\.jar" || true
-            sleep 3
-
-            # 실행 (disown으로 SSH 세션과 완전히 분리)
-            cd /home/ubuntu/order-service
-            nohup java -jar *.jar > /home/ubuntu/order-service/logs/startup.log 2>&1 &
-            disown
-            echo "Started order-service with PID $!"
         env:
           DB_URL: ${{ secrets.DB_URL }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          # .env 파일 로컬 생성 후 전송
+          cat > /tmp/app.env << EOF
+          DB_URL=${DB_URL}
+          DB_USERNAME=${DB_USERNAME}
+          DB_PASSWORD=${DB_PASSWORD}
+          DB_POOL_SIZE=5
+          LOG_PATH=~/order-service/logs
+          EOF
+
+          scp -i /tmp/ec2_key \
+            -o StrictHostKeyChecking=no \
+            /tmp/app.env \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/order-service/.env
+
+          # 배포 실행
+          ssh -i /tmp/ec2_key \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+              mkdir -p ~/order-service/logs
+              pkill -f "order-service.*\.jar" || true
+              sleep 3
+              cd ~/order-service
+              nohup java -jar *.jar > logs/startup.log 2>&1 &
+              disown
+              echo "Started PID $!"
+            '
+
+      - name: Cleanup
+        if: always()
+        run: rm -f /tmp/ec2_key /tmp/app.env
