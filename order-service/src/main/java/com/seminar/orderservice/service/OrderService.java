@@ -106,21 +106,24 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<Order> findAll() {
+        long start = System.currentTimeMillis();
         List<Order> orders = orderRepository.findAll();
-        log.info("service=order event=orders_queried count={}", orders.size());
+        log.info("service=order event=orders_queried count={} elapsed={}ms",
+                orders.size(), System.currentTimeMillis() - start);
         return orders;
     }
 
     @Transactional(readOnly = true)
     public Order findById(Long id) {
+        long start = System.currentTimeMillis();
         Order order = orderRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("주문을 찾을 수 없습니다 - orderId: " + id));
         if (order.getCustomerId() != null) {
             MDC.put("customerId", order.getCustomerId());
             MDC.put("pii", "[PII]");
         }
-        log.info("service=order event=order_queried orderId={} customerId={} status={}",
-                order.getId(), order.getCustomerId(), order.getStatus());
+        log.info("service=order event=order_queried orderId={} customerId={} status={} elapsed={}ms",
+                order.getId(), order.getCustomerId(), order.getStatus(), System.currentTimeMillis() - start);
         MDC.clear();
         return order;
     }
