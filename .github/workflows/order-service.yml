@@ -77,18 +77,20 @@ jobs:
             DB_USERNAME=$DB_USERNAME
             DB_PASSWORD=$DB_PASSWORD
             DB_POOL_SIZE=5
+            LOG_PATH=/home/ubuntu/order-service/logs
             EOF
 
-            # 로그 디렉토리 생성
-            mkdir -p /var/log/app
+            # 로그 디렉토리 생성 (ubuntu 유저가 쓸 수 있는 경로)
+            mkdir -p /home/ubuntu/order-service/logs
 
             # 기존 프로세스 종료
             pkill -f "order-service.*\.jar" || true
             sleep 3
 
-            # 실행
+            # 실행 (disown으로 SSH 세션과 완전히 분리)
             cd /home/ubuntu/order-service
-            nohup java -jar *.jar > /var/log/app/app.log 2>&1 &
+            nohup java -jar *.jar > /home/ubuntu/order-service/logs/startup.log 2>&1 &
+            disown
             echo "Started order-service with PID $!"
         env:
           DB_URL: ${{ secrets.DB_URL }}
