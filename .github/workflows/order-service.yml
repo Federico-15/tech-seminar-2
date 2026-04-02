@@ -108,6 +108,7 @@ jobs:
               sleep 3
               echo "=== starting app ==="
               cd $HOME/order-service
+              set -a && source .env && set +a
               nohup java -jar *.jar > logs/startup.log 2>&1 </dev/null &
               echo "Started PID $!"
             '
