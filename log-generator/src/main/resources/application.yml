@@ -1,0 +1,56 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  h2:
+    console:
+      enabled: false
+
+# Chaos Monkey 설정
+chaos:
+  monkey:
+    enabled: false          # 시작 시 비활성화, API로 활성화
+    watcher:
+      service: true         # @Service 레이어 감시
+      repository: true      # @Repository 레이어 감시
+      rest-controller: false
+    assaults:
+      level: 5              # 요청 10번 중 5번 공격
+      latency-active: false
+      exceptions-active: false
+      memory-active: false
+      kill-application-active: false
+      latency-range-start: 2000
+      latency-range-end: 5000
+
+# Actuator - Chaos Monkey API 노출
+management:
+  endpoint:
+    chaosmonkey:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: chaosmonkey, health
+
+# 로그 설정
+logging:
+  level:
+    root: WARN
+    org.springframework: WARN
+    org.hibernate: WARN
+    com.seminar.loggenerator: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%-8level] %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%-8level] %msg%n"
+  file:
+    name: /var/log/app/app.log

@@ -1,0 +1,41 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: ai-agent-scaledjob
+  namespace: ai-agents
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        containers:
+          - name: ai-agent
+            image: ${REGISTRY}/ai-agent-server:latest
+        restartPolicy: Never
+  # 이벤트 없을 때 최소 0개 유지 (비용 절감)
+  minReplicaCount: 0
+  maxReplicaCount: 5
+  # 분석 완료 후 즉시 종료
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  scalingStrategy:
+    strategy: "accurate"
+  triggers:
+    # GitHub Actions 트리거 HTTP 요청 큐 기반 스케일링
+    - type: metrics-api
+      metadata:
+        targetValue: "1"
+        url: "http://ai-agent-server-svc/metrics/pending-jobs"
+        valueLocation: "pending_count"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qwen3-model-cache-pvc
+  namespace: ai-agents
+spec:
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 60Gi  # Qwen3:30B 모델 크기
+  storageClassName: efs-sc  # AWS EFS (다중 Pod 공유 읽기)
