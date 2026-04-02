@@ -95,15 +95,14 @@ jobs:
 
           # 배포 실행
           echo "=== ssh deploy ==="
-          ssh -v -i /tmp/ec2_key \
+          ssh -i /tmp/ec2_key \
             -o StrictHostKeyChecking=no \
             ${EC2_USER}@${EC2_HOST} '
               mkdir -p $HOME/order-service/logs
               pkill -f "order-service.*\.jar" || true
               sleep 3
               cd $HOME/order-service
-              nohup java -jar *.jar > logs/startup.log 2>&1 &
-              disown
+              nohup java -jar *.jar > logs/startup.log 2>&1 </dev/null &
               echo "Started PID $!"
             '
 
