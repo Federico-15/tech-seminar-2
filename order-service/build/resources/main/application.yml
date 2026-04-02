@@ -44,16 +44,11 @@ management:
       exposure:
         include: "*"
 
-# 로그 설정
+# 로그 레벨만 관리 (파일/포맷은 logback-spring.xml에서 설정)
 logging:
   level:
     root: WARN
     org.springframework: WARN
     org.hibernate: WARN
-    com.zaxxer.hikari: WARN      # HikariCP 경고 로그는 허용
+    com.zaxxer.hikari: WARN
     com.seminar.orderservice: INFO
-  pattern:
-    console: "%d{yyyy-MM-dd HH:mm:ss} [%-8level] %X{pii}%msg%n"
-    file: "%d{yyyy-MM-dd HH:mm:ss} [%-8level] %X{pii}%msg%n"
-  file:
-    name: /var/log/app/app.log

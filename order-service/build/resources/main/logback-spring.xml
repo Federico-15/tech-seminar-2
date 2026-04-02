@@ -1,0 +1,42 @@
+<configuration>
+
+    <!-- ===== 콘솔 (로컬 개발용 plain text) ===== -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%-5level] %X{pii}%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- ===== 파일 (JSON - Fluent Bit 수집용) ===== -->
+    <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- LOG_PATH 환경변수로 경로 주입. 없으면 ./logs 사용 (로컬 fallback) -->
+        <file>${LOG_PATH:-./logs}/app.log</file>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH:-./logs}/app-%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>500MB</totalSizeCap>
+        </rollingPolicy>
+
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <customFields>{"app":"order-service"}</customFields>
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <version>[ignore]</version>
+                <levelValue>[ignore]</levelValue>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <!-- ===== 로그 레벨 설정 ===== -->
+    <logger name="com.seminar.orderservice" level="INFO"/>
+    <logger name="org.springframework"       level="WARN"/>
+    <logger name="org.hibernate"             level="WARN"/>
+    <logger name="com.zaxxer.hikari"         level="WARN"/>
+
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE_JSON"/>
+    </root>
+
+</configuration>
