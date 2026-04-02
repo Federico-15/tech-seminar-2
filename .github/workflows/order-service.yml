@@ -72,18 +72,30 @@ jobs:
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
+          set -x
+
+          # SSH 키 확인
+          echo "=== SSH key check ==="
+          head -1 /tmp/ec2_key
+          wc -l /tmp/ec2_key
+
           # .env 파일 로컬 생성 (공백 없이)
           printf 'DB_URL=%s\nDB_USERNAME=%s\nDB_PASSWORD=%s\nDB_POOL_SIZE=5\nLOG_PATH=/home/%s/order-service/logs\n' \
             "$DB_URL" "$DB_USERNAME" "$DB_PASSWORD" "$EC2_USER" > /tmp/app.env
 
+          echo "=== .env check ==="
+          wc -l /tmp/app.env
+
           # .env 전송
-          scp -i /tmp/ec2_key \
+          echo "=== scp .env ==="
+          scp -v -i /tmp/ec2_key \
             -o StrictHostKeyChecking=no \
             /tmp/app.env \
             ${EC2_USER}@${EC2_HOST}:/home/${EC2_USER}/order-service/.env
 
           # 배포 실행
-          ssh -i /tmp/ec2_key \
+          echo "=== ssh deploy ==="
+          ssh -v -i /tmp/ec2_key \
             -o StrictHostKeyChecking=no \
             ${EC2_USER}@${EC2_HOST} '
               mkdir -p $HOME/order-service/logs
