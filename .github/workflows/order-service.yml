@@ -146,6 +146,19 @@ jobs:
               nohup /opt/fluent-bit/bin/fluent-bit -c $HOME/fluent-bit.conf \
                 > $HOME/fluent-bit.log 2>&1 </dev/null &
               echo "Started fluent-bit PID $!"
+
+              echo "=== node-exporter ==="
+              if ! command -v node_exporter &>/dev/null; then
+                NODE_EXPORTER_VERSION=1.8.0
+                wget -q "https://github.com/prometheus/node_exporter/releases/download/v${NODE_EXPORTER_VERSION}/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64.tar.gz" -O /tmp/node_exporter.tar.gz
+                tar -xzf /tmp/node_exporter.tar.gz -C /tmp
+                sudo mv /tmp/node_exporter-${NODE_EXPORTER_VERSION}.linux-amd64/node_exporter /usr/local/bin/
+                rm -rf /tmp/node_exporter*
+              fi
+              pkill node_exporter 2>/dev/null || true
+              sleep 1
+              nohup node_exporter > $HOME/node_exporter.log 2>&1 </dev/null &
+              echo "Started node_exporter PID $!"
             '
 
       - name: Cleanup

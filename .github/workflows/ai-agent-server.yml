@@ -105,22 +105,11 @@ jobs:
               cd ~/log-server/g5
               EC2_HOST=$EC2_T3_HOST ./start.sh
 
-              # 기존 ai-agent-server 프로세스 종료
-              PID_FILE=$HOME/ai-agent-server/server.pid
-              if [ -f "$PID_FILE" ]; then
-                OLD_PID=$(cat "$PID_FILE")
-                kill "$OLD_PID" 2>/dev/null && echo "Killed PID $OLD_PID" || echo "No process at PID $OLD_PID"
-                rm -f "$PID_FILE"
-                sleep 2
-              fi
-
-              # ai-agent-server 실행
+              # ai-agent-server 재시작
               cd ~/ai-agent-server
               mkdir -p logs
-              nohup .venv/bin/uvicorn server:app --host 0.0.0.0 --port 8000 \
-                > logs/server.log 2>&1 </dev/null &
-              echo $! > "$PID_FILE"
-              echo "Started ai-agent-server PID $(cat $PID_FILE)"
+              sudo systemctl restart ai-agent-server
+              echo "Restarted ai-agent-server"
             '
 
       - name: Cleanup
