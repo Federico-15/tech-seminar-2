@@ -79,7 +79,7 @@ jobs:
           LOKI_URL: http://localhost:3100
         run: |
           # .env 파일 생성
-          printf 'LLM_PROVIDER=CLAUDE_API\nANTHROPIC_API_KEY=%s\nCLAUDE_MODEL=claude-sonnet-4-6\nVLLM_BASE_URL=http://localhost:8001\nVLLM_4B_MODEL=Qwen/Qwen3-4B\nVLLM_DEEP_URL=http://localhost:8002\nVLLM_30B_MODEL=Qwen/Qwen3-8B\nLLM_TIMEOUT_SECONDS=120\nLOKI_URL=%s\nLOKI_LOG_QUERY='"'"'{job="app_logs"}'"'"'\nPROMETHEUS_URL=http://localhost:9090\nPOLL_INTERVAL_SECONDS=%s\nLOG_LOOKBACK_MINUTES=5\nAURORA_HOST=%s\nAURORA_PORT=5432\nAURORA_DB=ai_agent\nAURORA_USER=%s\nAURORA_PASSWORD=%s\nHOST=0.0.0.0\nPORT=8000\n' \
+          printf 'LLM_PROVIDER=CLAUDE_API\nANTHROPIC_API_KEY=%s\nCLAUDE_MODEL=claude-sonnet-4-6\nVLLM_BASE_URL=http://localhost:30001\nVLLM_4B_MODEL=Qwen/Qwen3-4B\nVLLM_DEEP_URL=http://localhost:30002\nVLLM_30B_MODEL=Qwen/Qwen3-8B\nLLM_TIMEOUT_SECONDS=120\nLOKI_URL=%s\nLOKI_LOG_QUERY='"'"'{job="app_logs"}'"'"'\nPROMETHEUS_URL=http://localhost:9090\nPOLL_INTERVAL_SECONDS=%s\nLOG_LOOKBACK_MINUTES=5\nAURORA_HOST=%s\nAURORA_PORT=5432\nAURORA_DB=ai_agent\nAURORA_USER=%s\nAURORA_PASSWORD=%s\nHOST=0.0.0.0\nPORT=8000\n' \
             "$ANTHROPIC_API_KEY" "$LOKI_URL" "$POLL_INTERVAL_SECONDS" "$AURORA_HOST" "$AURORA_USER" "$AURORA_PASSWORD" \
             > /tmp/ai_agent.env
 
@@ -110,6 +110,13 @@ jobs:
               mkdir -p logs
               sudo systemctl restart ai-agent-server
               echo "Restarted ai-agent-server"
+
+              # k8s 네임스페이스 및 노드 레이블 확인
+              kubectl create namespace ai-agents --dry-run=client -o yaml | kubectl apply -f -
+              kubectl label node $(kubectl get nodes -o jsonpath='"'"'{.items[0].metadata.name}'"'"') nvidia.com/gpu=true --overwrite
+
+              # k8s 매니페스트 적용 (8B는 replicas: 0 유지 — KEDA가 관리)
+              kubectl apply -f ~/ai-agent-server/k8s/gpu-pod-template.yaml
             '
 
       - name: Cleanup

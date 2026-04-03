@@ -9,7 +9,7 @@ spec:
       spec:
         containers:
           - name: deep-analysis
-            image: ${REGISTRY}/ai-agent-server:latest
+            image: peter1256456/ai-agent-server:latest
             # kafka_consumer.py를 진입점으로 실행 — Kafka에서 메시지를 꺼내 8B로 분석
             command: ["python", "-m", "agents.kafka_consumer"]
             env:

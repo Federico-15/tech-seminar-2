@@ -41,8 +41,9 @@ spec:
               mountPath: /root/.cache/huggingface
       volumes:
         - name: model-cache
-          persistentVolumeClaim:
-            claimName: qwen3-model-cache-pvc
+          hostPath:
+            path: /home/ubuntu/.cache/huggingface
+            type: Directory
       nodeSelector:
         nvidia.com/gpu: "true"
       tolerations:
@@ -62,6 +63,8 @@ spec:
   ports:
     - port: 8001
       targetPort: 8001
+      nodePort: 30001
+  type: NodePort
 ---
 # vLLM 8B Deployment — 이벤트 기반 실행 (CRITICAL 정밀 분석)
 # 평상시 replicas: 0 (VRAM 미점유).
@@ -107,8 +110,9 @@ spec:
               mountPath: /root/.cache/huggingface
       volumes:
         - name: model-cache
-          persistentVolumeClaim:
-            claimName: qwen3-model-cache-pvc
+          hostPath:
+            path: /home/ubuntu/.cache/huggingface
+            type: Directory
       nodeSelector:
         nvidia.com/gpu: "true"
       tolerations:
@@ -128,17 +132,5 @@ spec:
   ports:
     - port: 8002
       targetPort: 8002
----
-# 모델 캐시 PVC (4B + 8B 모델 공유)
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: qwen3-model-cache-pvc
-  namespace: ai-agents
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 60Gi   # 4B(~8GB) + 8B(~16GB) + 여유
-  storageClassName: gp3
+      nodePort: 30002
+  type: NodePort
