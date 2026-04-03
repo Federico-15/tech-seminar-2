@@ -20,9 +20,9 @@ class Settings(BaseSettings):
     vllm_base_url: str = "http://localhost:8001"
     vllm_4b_model: str = "Qwen/Qwen3-4B"
 
-    # vLLM — Qwen3:30B (이벤트 기반 정밀 분석용, KEDA Pod)
+    # vLLM — Qwen3:8B (이벤트 기반 정밀 분석용 — CRITICAL 시에만 Pod 생성)
     vllm_deep_url: str = "http://localhost:8002"
-    vllm_30b_model: str = "Qwen/Qwen3-30B-A3B-AWQ"
+    vllm_30b_model: str = "Qwen/Qwen3-8B"
 
     llm_timeout_seconds: int = 120
 
@@ -36,6 +36,18 @@ class Settings(BaseSettings):
     # 모니터링 설정
     poll_interval_seconds: int = 30
     log_lookback_minutes: int = 5
+
+    # Kafka
+    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_topic_critical: str = "critical-anomalies"   # CRITICAL 이벤트 큐
+    kafka_consumer_group: str = "deep-analysis-group"  # 8B Pod consumer 그룹
+
+    # Kubernetes GPU 스케줄링
+    k8s_namespace: str = "ai-agents"
+    k8s_vllm_4b_deployment: str = "vllm-4b"           # 상시 감시 모델
+    k8s_vllm_8b_deployment: str = "vllm-8b"           # 정밀 분석 모델
+    # 로컬 개발 시 False로 두면 K8s API 호출 스킵
+    k8s_enabled: bool = False
 
     # Slack 알림 (선택)
     slack_webhook_url: str = ""

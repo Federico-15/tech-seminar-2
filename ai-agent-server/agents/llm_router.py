@@ -25,6 +25,10 @@ SENSITIVE_KEYWORDS = [
 
 
 def is_sensitive(content: str) -> bool:
+    """[PII] 태그 또는 민감 키워드 포함 여부를 검사합니다."""
+    # 로그 생성 시점에 개발자가 명시한 [PII] 태그 — 키워드보다 우선 적용
+    if "[PII]" in content:
+        return True
     lower = content.lower()
     return any(kw in lower for kw in SENSITIVE_KEYWORDS)
 
@@ -63,7 +67,7 @@ def call_llm_deep(prompt: str, system: str = "") -> tuple[str, str]:
     CLAUDE_API: Claude Sonnet
     """
     if settings.llm_provider == "QWEN_LOCAL":
-        return _call_vllm(prompt, system, settings.vllm_deep_url, settings.vllm_30b_model), "qwen3:30b"
+        return _call_vllm(prompt, system, settings.vllm_deep_url, settings.vllm_30b_model), "qwen3:8b"
     return _call_claude(prompt, system), "claude-sonnet"
 
 

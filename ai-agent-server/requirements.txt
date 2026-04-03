@@ -11,3 +11,9 @@ psycopg2-binary==2.9.10
 
 # Settings
 pydantic-settings==2.6.1
+
+# Kafka
+aiokafka==0.11.0
+
+# Kubernetes
+kubernetes==31.0.0

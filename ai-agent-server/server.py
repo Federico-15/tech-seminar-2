@@ -15,6 +15,7 @@ from fastapi.responses import JSONResponse
 
 from config.settings import settings
 from agents import analyze_logs, analyze_metrics, run_deep_analysis
+from agents.kafka_producer import publish_critical_event
 from tools.loki_tool import fetch_recent_logs
 from tools.prometheus_tool import fetch_metrics
 from storage.aurora_store import (
@@ -37,6 +38,7 @@ _state: dict[str, Any] = {
     "last_poll_at": None,
     "total_anomalies": 0,
     "last_anomaly_at": None,
+    "pending_kafka_jobs": 0,   # KEDA /metrics/pending-jobs 용
 }
 
 
@@ -80,16 +82,34 @@ async def run_monitoring_cycle() -> None:
         anomalies.append((metric_result, record_id, []))
         logger.info(f"[Monitor] 메트릭 이상: severity={metric_result.severity}, id={record_id}")
 
-    # HIGH/CRITICAL → 정밀 분석 + 장애 이력 생성
+    # HIGH/CRITICAL → 정밀 분석
+    # CRITICAL: Kafka 큐에 적재 → KEDA가 8B Pod 생성 → kafka_consumer.py가 처리
+    # HIGH:     직접 deep_analysis 호출 (4B Pod 유지한 채 처리)
     for result, trigger_id, raw_logs in anomalies:
-        if result.severity in ("CRITICAL", "HIGH"):
+        if result.severity == "CRITICAL":
+            try:
+                published = await publish_critical_event(result, raw_logs)
+                if published:
+                    _state["pending_kafka_jobs"] += 1
+                    logger.info(
+                        f"[Monitor] CRITICAL → Kafka 발행 완료 "
+                        f"(pending={_state['pending_kafka_jobs']}). "
+                        f"KEDA가 8B Pod를 생성합니다."
+                    )
+                else:
+                    # Kafka 미설정 시 fallback: 직접 정밀 분석
+                    report = await run_deep_analysis(result, raw_logs)
+                    save_analysis_report(report, trigger_id=trigger_id)
+                    save_incident(cause=result.summary)
+            except Exception as e:
+                logger.error(f"[Monitor] CRITICAL 처리 실패: {e}")
+
+        elif result.severity == "HIGH":
             try:
                 report = await run_deep_analysis(result, raw_logs)
                 save_analysis_report(report, trigger_id=trigger_id)
-                if result.severity == "CRITICAL":
-                    save_incident(cause=result.summary)
             except Exception as e:
-                logger.error(f"[Monitor] 정밀 분석 실패: {e}")
+                logger.error(f"[Monitor] HIGH 정밀 분석 실패: {e}")
 
         await _notify_slack(result, trigger_id)
 
@@ -180,6 +200,23 @@ async def manual_trigger():
     """수동 분석 트리거 — 데모/테스트용."""
     asyncio.create_task(run_monitoring_cycle())
     return {"message": "분석 트리거됨"}
+
+
+@app.get("/metrics/pending-jobs")
+async def pending_jobs():
+    """
+    KEDA metrics-api 트리거용 엔드포인트.
+    Kafka로 발행된 미처리 CRITICAL 이벤트 수를 반환합니다.
+    KEDA가 이 값을 감지해 8B Pod 생성 여부를 결정합니다.
+    """
+    return {"pending_count": _state["pending_kafka_jobs"]}
+
+
+@app.post("/metrics/pending-jobs/reset")
+async def reset_pending_jobs():
+    """8B Pod 분석 완료 후 호출 — pending 카운터를 초기화합니다."""
+    _state["pending_kafka_jobs"] = 0
+    return {"message": "pending_count 초기화 완료"}
 
 
 @app.get("/history")

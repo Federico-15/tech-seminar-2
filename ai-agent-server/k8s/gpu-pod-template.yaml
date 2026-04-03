@@ -1,19 +1,20 @@
 ---
-# vLLM 서버 Deployment (Qwen3:30B 상시 서빙)
+# vLLM 4B Deployment — 상시 실행 (로그·메트릭 감시)
+# 평상시 VRAM ~11GB 점유. CRITICAL 감지 시 replicas: 0으로 축소되어 VRAM 반환.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vllm-server
+  name: vllm-4b
   namespace: ai-agents
 spec:
-  replicas: 1
+  replicas: 1   # 평상시 상시 1개 유지
   selector:
     matchLabels:
-      app: vllm-server
+      app: vllm-4b
   template:
     metadata:
       labels:
-        app: vllm-server
+        app: vllm-4b
     spec:
       containers:
         - name: vllm
@@ -23,20 +24,18 @@ spec:
             - -m
             - vllm.entrypoints.openai.api_server
             - --model
-            - Qwen/Qwen3-30B-A3B-AWQ
-            - --quantization
-            - awq
+            - Qwen/Qwen3-4B
             - --max-model-len
             - "8192"
             - --host
             - "0.0.0.0"
             - --port
-            - "8000"
+            - "8001"
           ports:
-            - containerPort: 8000
+            - containerPort: 8001
           resources:
             limits:
-              nvidia.com/gpu: 1   # A10G GPU 1개
+              nvidia.com/gpu: 1   # A10G 1개 (VRAM ~11GB)
           volumeMounts:
             - name: model-cache
               mountPath: /root/.cache/huggingface
@@ -51,70 +50,86 @@ spec:
           operator: Exists
           effect: NoSchedule
 ---
-# vLLM 서비스
+# vLLM 4B Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: vllm-service
+  name: vllm-4b-service
   namespace: ai-agents
 spec:
   selector:
-    app: vllm-server
+    app: vllm-4b
   ports:
-    - port: 8000
-      targetPort: 8000
+    - port: 8001
+      targetPort: 8001
 ---
-# AI Agent Job (KEDA 트리거 — PR 이벤트 시 생성)
-apiVersion: batch/v1
-kind: Job
+# vLLM 8B Deployment — 이벤트 기반 실행 (CRITICAL 정밀 분석)
+# 평상시 replicas: 0 (VRAM 미점유).
+# CRITICAL 감지 시 k8s_scaler.py가 replicas: 1로 올림 → VRAM ~19GB 로딩(~2분).
+# 분석 완료 후 다시 replicas: 0으로 축소 → 4B 복귀.
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: ai-agent-scan
+  name: vllm-8b
   namespace: ai-agents
 spec:
-  ttlSecondsAfterFinished: 300
-  backoffLimit: 1
+  replicas: 0   # 평상시 꺼진 상태
+  selector:
+    matchLabels:
+      app: vllm-8b
   template:
+    metadata:
+      labels:
+        app: vllm-8b
     spec:
-      restartPolicy: Never
       containers:
-        - name: ai-agent
-          image: ${REGISTRY}/ai-agent-server:${IMAGE_TAG}
-          env:
-            - name: LLM_PROVIDER
-              value: "QWEN_LOCAL"          # 데모: vLLM 사용
-            - name: VLLM_BASE_URL
-              value: "http://vllm-service.ai-agents.svc.cluster.local:8000"
-            - name: VLLM_MODEL
-              value: "Qwen/Qwen3-30B-A3B-AWQ"
-            - name: GITHUB_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: ai-agent-secrets
-                  key: github-token
-            - name: AURORA_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: ai-agent-secrets
-                  key: aurora-host
-            - name: AURORA_USER
-              valueFrom:
-                secretKeyRef:
-                  name: ai-agent-secrets
-                  key: aurora-user
-            - name: AURORA_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: ai-agent-secrets
-                  key: aurora-password
+        - name: vllm
+          image: vllm/vllm-openai:latest
+          command:
+            - python
+            - -m
+            - vllm.entrypoints.openai.api_server
+            - --model
+            - Qwen/Qwen3-8B
+            - --max-model-len
+            - "8192"
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8002"
+          ports:
+            - containerPort: 8002
           resources:
-            requests:
-              cpu: "1"
-              memory: "2Gi"
             limits:
-              cpu: "2"
-              memory: "4Gi"
+              nvidia.com/gpu: 1   # A10G 1개 (VRAM ~19GB)
+          volumeMounts:
+            - name: model-cache
+              mountPath: /root/.cache/huggingface
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: qwen3-model-cache-pvc
+      nodeSelector:
+        nvidia.com/gpu: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
 ---
-# 모델 캐시 PVC (A10G 24GB VRAM 기준 — AWQ 4bit 약 20GB)
+# vLLM 8B Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm-8b-service
+  namespace: ai-agents
+spec:
+  selector:
+    app: vllm-8b
+  ports:
+    - port: 8002
+      targetPort: 8002
+---
+# 모델 캐시 PVC (4B + 8B 모델 공유)
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -125,5 +140,5 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 50Gi
+      storage: 60Gi   # 4B(~8GB) + 8B(~16GB) + 여유
   storageClassName: gp3

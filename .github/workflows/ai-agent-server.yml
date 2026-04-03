@@ -74,6 +74,7 @@ jobs:
           AURORA_HOST: ${{ secrets.AURORA_HOST }}
           AURORA_USER: ${{ secrets.AURORA_USER }}
           AURORA_PASSWORD: ${{ secrets.AURORA_PASSWORD }}
+          EC2_T3_HOST: ${{ secrets.EC2_HOST }}
           LOKI_URL: http://localhost:3100
         run: |
           # .env 파일 생성
@@ -99,9 +100,9 @@ jobs:
               python3 -m venv .venv
               .venv/bin/pip install -q -r requirements.txt
 
-              # log-server (Loki + Grafana) 실행
-              cd ~/log-server
-              docker compose up -d
+              # log-server (Loki + Grafana + Prometheus) 실행
+              cd ~/log-server/g5
+              EC2_HOST=$EC2_T3_HOST ./start.sh
 
               # 기존 ai-agent-server 프로세스 종료
               PID_FILE=$HOME/ai-agent-server/server.pid
@@ -114,6 +115,7 @@ jobs:
 
               # ai-agent-server 실행
               cd ~/ai-agent-server
+              mkdir -p logs
               nohup .venv/bin/uvicorn server:app --host 0.0.0.0 --port 8000 \
                 > logs/server.log 2>&1 </dev/null &
               echo $! > "$PID_FILE"

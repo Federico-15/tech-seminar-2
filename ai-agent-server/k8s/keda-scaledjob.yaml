@@ -1,41 +1,61 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledJob
 metadata:
-  name: ai-agent-scaledjob
+  name: deep-analysis-scaledjob
   namespace: ai-agents
 spec:
   jobTargetRef:
     template:
       spec:
         containers:
-          - name: ai-agent
+          - name: deep-analysis
             image: ${REGISTRY}/ai-agent-server:latest
+            # kafka_consumer.py를 진입점으로 실행 — Kafka에서 메시지를 꺼내 8B로 분석
+            command: ["python", "-m", "agents.kafka_consumer"]
+            env:
+              - name: LLM_PROVIDER
+                value: "QWEN_LOCAL"
+              # 8B Pod는 deep endpoint(30B/8B)만 사용
+              - name: VLLM_DEEP_URL
+                value: "http://vllm-deep-service.ai-agents.svc.cluster.local:8002"
+              - name: KAFKA_BOOTSTRAP_SERVERS
+                value: "kafka-service.ai-agents.svc.cluster.local:9092"
+              - name: AURORA_HOST
+                valueFrom:
+                  secretKeyRef:
+                    name: ai-agent-secrets
+                    key: aurora-host
+              - name: AURORA_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: ai-agent-secrets
+                    key: aurora-user
+              - name: AURORA_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: ai-agent-secrets
+                    key: aurora-password
+            resources:
+              requests:
+                cpu: "1"
+                memory: "2Gi"
+              limits:
+                cpu: "2"
+                memory: "4Gi"
         restartPolicy: Never
-  # 이벤트 없을 때 최소 0개 유지 (비용 절감)
+  # 큐가 비면 최소 0개 유지 (비용 절감)
   minReplicaCount: 0
-  maxReplicaCount: 5
-  # 분석 완료 후 즉시 종료
+  maxReplicaCount: 3
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
   scalingStrategy:
     strategy: "accurate"
   triggers:
-    # GitHub Actions 트리거 HTTP 요청 큐 기반 스케일링
-    - type: metrics-api
+    # Kafka 큐 감시 — critical-anomalies 토픽에 메시지가 쌓이면 Job 생성
+    - type: kafka
       metadata:
-        targetValue: "1"
-        url: "http://ai-agent-server-svc/metrics/pending-jobs"
-        valueLocation: "pending_count"
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: qwen3-model-cache-pvc
-  namespace: ai-agents
-spec:
-  accessModes:
-    - ReadOnlyMany
-  resources:
-    requests:
-      storage: 60Gi  # Qwen3:30B 모델 크기
-  storageClassName: efs-sc  # AWS EFS (다중 Pod 공유 읽기)
+        bootstrapServers: "kafka-service.ai-agents.svc.cluster.local:9092"
+        consumerGroup: "deep-analysis-group"
+        topic: "critical-anomalies"
+        lagThreshold: "1"          # 메시지 1개 이상 → Job 1개 생성
+        offsetResetPolicy: "earliest"
