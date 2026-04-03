@@ -71,6 +71,10 @@ jobs:
         run: |
           scp -i /tmp/ec2_key \
             -o StrictHostKeyChecking=no \
+            ./log-server/t3/parsers.conf \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/
+          scp -i /tmp/ec2_key \
+            -o StrictHostKeyChecking=no \
             ./log-server/t3/fluent-bit.conf \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/
 
