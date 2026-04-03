@@ -136,7 +136,7 @@ jobs:
               pkill fluent-bit 2>/dev/null || true
               sleep 1
               set -a && source $HOME/order-service/.env && set +a
-              nohup fluent-bit -c $HOME/fluent-bit.conf \
+              nohup /opt/fluent-bit/bin/fluent-bit -c $HOME/fluent-bit.conf \
                 > $HOME/fluent-bit.log 2>&1 </dev/null &
               echo "Started fluent-bit PID $!"
             '
