@@ -64,6 +64,13 @@ jobs:
             ./artifact/*.jar \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/order-service/
 
+      - name: Copy fluent-bit config
+        run: |
+          scp -i /tmp/ec2_key \
+            -o StrictHostKeyChecking=no \
+            ./log-server/t3/fluent-bit.conf \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/
+
       - name: Deploy on EC2
         env:
           EC2_USER: ${{ secrets.EC2_USER }}
@@ -71,6 +78,7 @@ jobs:
           DB_URL: ${{ secrets.DB_URL }}
           DB_USERNAME: ${{ secrets.DB_USERNAME }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          LOKI_HOST: ${{ secrets.EC2_AI_HOST }}
         run: |
           set -x
 
@@ -80,8 +88,8 @@ jobs:
           wc -l /tmp/ec2_key
 
           # .env 파일 로컬 생성 (공백 없이)
-          printf 'DB_URL=%s\nDB_USERNAME=%s\nDB_PASSWORD=%s\nDB_POOL_SIZE=5\nLOG_PATH=/home/%s/order-service/logs\n' \
-            "$DB_URL" "$DB_USERNAME" "$DB_PASSWORD" "$EC2_USER" > /tmp/app.env
+          printf 'DB_URL=%s\nDB_USERNAME=%s\nDB_PASSWORD=%s\nDB_POOL_SIZE=5\nLOG_PATH=/home/%s/order-service/logs\nLOKI_HOST=%s\n' \
+            "$DB_URL" "$DB_USERNAME" "$DB_PASSWORD" "$EC2_USER" "$LOKI_HOST" > /tmp/app.env
 
           echo "=== .env check ==="
           wc -l /tmp/app.env
@@ -123,6 +131,14 @@ jobs:
               nohup java -jar *.jar > logs/startup.log 2>&1 </dev/null &
               echo $! > "$PID_FILE"
               echo "Started PID $(cat $PID_FILE)"
+
+              echo "=== fluent-bit ==="
+              pkill fluent-bit 2>/dev/null || true
+              sleep 1
+              set -a && source $HOME/order-service/.env && set +a
+              nohup fluent-bit -c $HOME/fluent-bit.conf \
+                > $HOME/fluent-bit.log 2>&1 </dev/null &
+              echo "Started fluent-bit PID $!"
             '
 
       - name: Cleanup
