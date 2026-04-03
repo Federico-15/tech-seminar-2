@@ -75,11 +75,12 @@ jobs:
           AURORA_USER: ${{ secrets.AURORA_USER }}
           AURORA_PASSWORD: ${{ secrets.AURORA_PASSWORD }}
           EC2_T3_HOST: ${{ secrets.EC2_HOST }}
+          POLL_INTERVAL_SECONDS: ${{ secrets.POLL_INTERVAL_SECONDS }}
           LOKI_URL: http://localhost:3100
         run: |
           # .env 파일 생성
-          printf 'LLM_PROVIDER=CLAUDE_API\nANTHROPIC_API_KEY=%s\nCLAUDE_MODEL=claude-sonnet-4-6\nLOKI_URL=%s\nLOKI_LOG_QUERY={job="app_logs"}\nPROMETHEUS_URL=http://localhost:9090\nPOLL_INTERVAL_SECONDS=30\nLOG_LOOKBACK_MINUTES=5\nAURORA_HOST=%s\nAURORA_PORT=5432\nAURORA_DB=ai_agent\nAURORA_USER=%s\nAURORA_PASSWORD=%s\nHOST=0.0.0.0\nPORT=8000\n' \
-            "$ANTHROPIC_API_KEY" "$LOKI_URL" "$AURORA_HOST" "$AURORA_USER" "$AURORA_PASSWORD" \
+          printf 'LLM_PROVIDER=CLAUDE_API\nANTHROPIC_API_KEY=%s\nCLAUDE_MODEL=claude-sonnet-4-6\nLOKI_URL=%s\nLOKI_LOG_QUERY={job="app_logs"}\nPROMETHEUS_URL=http://localhost:9090\nPOLL_INTERVAL_SECONDS=%s\nLOG_LOOKBACK_MINUTES=5\nAURORA_HOST=%s\nAURORA_PORT=5432\nAURORA_DB=ai_agent\nAURORA_USER=%s\nAURORA_PASSWORD=%s\nHOST=0.0.0.0\nPORT=8000\n' \
+            "$ANTHROPIC_API_KEY" "$LOKI_URL" "$POLL_INTERVAL_SECONDS" "$AURORA_HOST" "$AURORA_USER" "$AURORA_PASSWORD" \
             > /tmp/ai_agent.env
 
           scp -i /tmp/ai_ec2_key \
