@@ -19,10 +19,7 @@ spec:
       containers:
         - name: vllm
           image: vllm/vllm-openai:latest
-          command:
-            - python
-            - -m
-            - vllm.entrypoints.openai.api_server
+          args:
             - --model
             - Qwen/Qwen3-4B
             - --max-model-len
@@ -88,10 +85,7 @@ spec:
       containers:
         - name: vllm
           image: vllm/vllm-openai:latest
-          command:
-            - python
-            - -m
-            - vllm.entrypoints.openai.api_server
+          args:
             - --model
             - Qwen/Qwen3-8B
             - --max-model-len
