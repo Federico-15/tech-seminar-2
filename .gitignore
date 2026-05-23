@@ -1,3 +1,24 @@
+# 환경변수 (절대 커밋 금지)
 .env
+
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.so
+.venv/
+venv/
+*.egg-info/
+
+# 런타임 파일
+server.pid
+*.log
+*.pid
+
+# 로그 / 저장소 (로컬 생성 파일)
+logs/
+storage/
+
+# IDE
+.idea/
+.vscode/
+*.swp

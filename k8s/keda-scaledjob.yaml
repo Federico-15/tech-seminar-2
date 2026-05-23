@@ -1,0 +1,62 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: deep-analysis-scaledjob
+  namespace: ai-agents
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        containers:
+          - name: deep-analysis
+            image: peter1256456/ai-agent-server:latest
+            imagePullPolicy: Never
+            # kafka_consumer.py를 진입점으로 실행 — Kafka에서 메시지를 꺼내 8B로 분석
+            command: ["python", "-m", "agents.kafka_consumer"]
+            env:
+              - name: LLM_PROVIDER
+                value: "QWEN_LOCAL"
+              # 8B Pod는 deep endpoint(30B/8B)만 사용
+              - name: VLLM_DEEP_URL
+                value: "http://vllm-8b-service.ai-agents.svc.cluster.local:8002"
+              - name: KAFKA_BOOTSTRAP_SERVERS
+                value: "kafka-service.ai-agents.svc.cluster.local:9092"
+              - name: AURORA_HOST
+                valueFrom:
+                  secretKeyRef:
+                    name: ai-agent-secrets
+                    key: aurora-host
+              - name: AURORA_USER
+                valueFrom:
+                  secretKeyRef:
+                    name: ai-agent-secrets
+                    key: aurora-user
+              - name: AURORA_PASSWORD
+                valueFrom:
+                  secretKeyRef:
+                    name: ai-agent-secrets
+                    key: aurora-password
+            resources:
+              requests:
+                cpu: "1"
+                memory: "2Gi"
+              limits:
+                cpu: "2"
+                memory: "4Gi"
+        restartPolicy: Never
+  # 큐가 비면 최소 0개 유지 (비용 절감)
+  minReplicaCount: 0
+  maxReplicaCount: 1
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  scalingStrategy:
+    strategy: "accurate"
+  triggers:
+    # Kafka 큐 감시 — critical-anomalies 토픽에 메시지가 쌓이면 Job 생성
+    - type: kafka
+      metadata:
+        bootstrapServers: "kafka-service.ai-agents.svc.cluster.local:9092"
+        consumerGroup: "deep-analysis-group"
+        topic: "critical-anomalies"
+        lagThreshold: "1"          # 메시지 1개 이상 → Job 1개 생성
+        offsetResetPolicy: "earliest"

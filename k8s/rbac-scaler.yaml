@@ -1,0 +1,26 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vllm-scaler
+  namespace: ai-agents
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vllm-scaler-binding
+  namespace: ai-agents
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: ai-agents
+roleRef:
+  kind: Role
+  name: vllm-scaler
+  apiGroup: rbac.authorization.k8s.io
